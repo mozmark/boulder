@@ -356,8 +356,6 @@ function sendResponse() {
 
   cli.spinner("Validating domain");
 
-  var options = url.parse(state.responseURL);
-  options.method = "POST";
   var req = request.post(state.responseURL, {}, ensureValidation);
   req.write(payload)
   req.end();
