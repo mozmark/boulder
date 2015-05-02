@@ -31,36 +31,36 @@ type WebFrontEndImpl struct {
 	log   *blog.AuditLogger
 
 	// URL configuration parameters
-	BaseURL      string
-	NewReg       string
-	NewRegPath   string
-	RegBase      string
-	RegPath      string
-	NewAuthz     string
-	NewAuthzPath string
-	AuthzBase    string
-	AuthzPath    string
-	NewCert      string
-	NewCertPath  string
-	CertBase     string
-	CertPath     string
-	RevokeCertPath  string
-	TermsPath    string
+	BaseURL        string
+	NewReg         string
+	NewRegPath     string
+	RegBase        string
+	RegPath        string
+	NewAuthz       string
+	NewAuthzPath   string
+	AuthzBase      string
+	AuthzPath      string
+	NewCert        string
+	NewCertPath    string
+	CertBase       string
+	CertPath       string
+	RevokeCertPath string
+	TermsPath      string
 }
 
 func NewWebFrontEndImpl() WebFrontEndImpl {
 	logger := blog.GetAuditLogger()
 	logger.Notice("Web Front End Starting")
 	return WebFrontEndImpl{
-		log:          logger,
-		NewRegPath:   "/acme/new-reg",
-		RegPath:      "/acme/reg/",
-		NewAuthzPath: "/acme/new-authz",
-		AuthzPath:    "/acme/authz/",
-		NewCertPath:  "/acme/new-cert",
-		CertPath:     "/acme/cert/",
-		RevokeCertPath:   "/acme/revoke-cert/",
-		TermsPath:    "/terms",
+		log:            logger,
+		NewRegPath:     "/acme/new-reg",
+		RegPath:        "/acme/reg/",
+		NewAuthzPath:   "/acme/new-authz",
+		AuthzPath:      "/acme/authz/",
+		NewCertPath:    "/acme/new-cert",
+		CertPath:       "/acme/cert/",
+		RevokeCertPath: "/acme/revoke-cert/",
+		TermsPath:      "/terms",
 	}
 }
 
@@ -288,7 +288,7 @@ func (wfe *WebFrontEndImpl) RevokeCertificate(response http.ResponseWriter, requ
 		wfe.sendError(response, "No such certificate", http.StatusNotFound)
 		return
 	}
-	
+
 	if certStatus.Status == core.OCSPStatusRevoked {
 		wfe.sendError(response, "Certificate already revoked", http.StatusConflict)
 		return
