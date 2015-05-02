@@ -6,6 +6,7 @@
 package wfe
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 type WebFrontEndImpl struct {
 	RA    core.RegistrationAuthority
 	SA    core.StorageGetter
+	CA    core.CertificateAuthority
 	Stats statsd.Statter
 	log   *blog.AuditLogger
 
@@ -42,6 +44,7 @@ type WebFrontEndImpl struct {
 	NewCertPath   string
 	CertBase  string
 	CertPath  string
+	RevokeCertPath  string
 	TermsPath  string
 }
 
@@ -55,6 +58,7 @@ func NewWebFrontEndImpl(logger *blog.AuditLogger) WebFrontEndImpl {
 		AuthzPath:    "/acme/authz/",
 		NewCertPath:  "/acme/new-cert",
 		CertPath:     "/acme/cert/",
+		RevokeCertPath:   "/acme/revoke-cert/",
 		TermsPath:    "/terms",
 	}
 }
@@ -72,6 +76,7 @@ func (wfe *WebFrontEndImpl) HandlePaths() {
 	http.HandleFunc(wfe.RegPath, wfe.Registration)
 	http.HandleFunc(wfe.AuthzPath, wfe.Authorization)
 	http.HandleFunc(wfe.CertPath, wfe.Certificate)
+	http.HandleFunc(wfe.RevokeCertPath, wfe.RevokeCertificate)
 	http.HandleFunc(wfe.TermsPath, wfe.Terms)
 }
 
@@ -237,6 +242,83 @@ func (wfe *WebFrontEndImpl) NewAuthorization(response http.ResponseWriter, reque
 	}
 	// incr pending auth stat (?)
 	wfe.Stats.Inc("PendingAuthorizations", 1, 1.0)
+}
+
+func (wfe *WebFrontEndImpl) RevokeCertificate(response http.ResponseWriter, request *http.Request) {
+	if request.Method != "POST" {
+		wfe.sendError(response, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, requestKey, err := verifyPOST(request)
+	if err != nil {
+		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
+		return
+	}
+
+	type RevokeRequest struct {
+		Serial string
+	}
+	var revokeRequest RevokeRequest
+	if err = json.Unmarshal(body, &revokeRequest); err != nil {
+		fmt.Println("Couldn't unmarshal in revoke request", string(body))
+		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
+		return
+	}
+	if len(revokeRequest.Serial) != 32 {
+		wfe.log.Debug("Bad serial in revoke request " + revokeRequest.Serial)
+		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
+		return
+	}
+
+	certDER, err := wfe.SA.GetCertificate(revokeRequest.Serial)
+	if err != nil {
+		wfe.sendError(response, "No such certificate", http.StatusNotFound)
+		return
+	}
+	parsedCertificate, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		wfe.sendError(response, "Invalid certificate", http.StatusInternalServerError)
+		return
+	}
+
+	certStatus, err := wfe.SA.GetCertificateStatus(revokeRequest.Serial)
+	if err != nil {
+		wfe.sendError(response, "No such certificate", http.StatusNotFound)
+		return
+	}
+	
+	if certStatus.Status == core.OCSPStatusRevoked {
+		wfe.sendError(response, "Certificate already revoked", http.StatusConflict)
+		return
+	}
+
+	// TODO: Allow other types of keys.
+	if requestKey.Rsa == nil {
+		wfe.sendError(response, "Non-RSA keys not permitted.", http.StatusForbidden)
+		return
+	}
+	// TODO: Implement other methods of validating revocation, e.g. through
+	// authorizations on account.
+	if core.KeyDigest(requestKey.Rsa) != core.KeyDigest(parsedCertificate.PublicKey) {
+		wfe.log.Debug(fmt.Sprintf("Key mismatch for revoke: %s vs %s",
+			core.KeyDigest(requestKey),
+			core.KeyDigest(parsedCertificate.PublicKey)))
+		wfe.sendError(response,
+			"Revocation request must be signed by private key of cert to be revoked",
+			http.StatusForbidden)
+		return
+	}
+
+	err = wfe.CA.RevokeCertificate(revokeRequest.Serial)
+	if err != nil {
+		wfe.sendError(response,
+			"Failed to revoke certificate",
+			http.StatusInternalServerError)
+	} else {
+		fmt.Println("Revoked", revokeRequest.Serial)
+		response.WriteHeader(http.StatusOK)
+	}
 }
 
 func (wfe *WebFrontEndImpl) NewCertificate(response http.ResponseWriter, request *http.Request) {

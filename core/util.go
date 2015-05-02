@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hash"
 	"math/big"
 	"net/url"
@@ -84,6 +85,13 @@ func Fingerprint256(data []byte) string {
 	d := sha256.New()
 	_, _ = d.Write(data) // Never returns an error
 	return B64enc(d.Sum(nil))
+}
+
+func KeyDigest(key crypto.PublicKey) string {
+	keyDER, _ := x509.MarshalPKIXPublicKey(key)
+	spkiDigest := sha256.Sum256(keyDER)
+	fmt.Println(base64.StdEncoding.EncodeToString(keyDER))
+	return base64.StdEncoding.EncodeToString(spkiDigest[0:32])
 }
 
 // URLs that automatically marshal/unmarshal to JSON strings

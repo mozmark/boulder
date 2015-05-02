@@ -95,9 +95,14 @@ func (ssa *SQLStorageAuthority) InitTables() (err error) {
 	`CREATE TABLE IF NOT EXISTS certificates (
 		serial VARCHAR(255) PRIMARY KEY NOT NULL,
 		digest VARCHAR(255) NOT NULL,
+		spkiDigest VARCHAR(255) NOT NULL,
 		value BLOB NOT NULL,
 		issued DATETIME NOT NULL
 		);`,
+
+	// We want to be able to look up certs by their public key digest, for
+	// instance when checking new account keys aren't duplicates with certs.
+	`CREATE INDEX IF NOT EXISTS spkiDigest on certificates (spkiDigest)`,
 
 	// Create certificate status table. This provides metadata about a certificate
 	// that can change over its lifetime, and rows are updateable unlike the
@@ -527,8 +532,11 @@ func (ssa *SQLStorageAuthority) AddCertificate(certDER []byte) (digest string, e
 	}
 
 	digest = core.Fingerprint256(certDER)
-	_, err = tx.Exec("INSERT INTO certificates (serial, digest, value, issued) VALUES (?,?,?,?);",
-		serial, digest, certDER, time.Now())
+
+	spkiDigest := core.KeyDigest(parsedCertificate.PublicKey)
+
+	_, err = tx.Exec("INSERT INTO certificates (serial, digest, spkiDigest, value, issued) VALUES (?,?,?,?,?);",
+		serial, digest, spkiDigest, certDER, time.Now())
 	if err != nil {
 		tx.Rollback()
 		return
