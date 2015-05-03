@@ -7,7 +7,7 @@ package core
 
 import (
 	"crypto/x509"
-	"github.com/letsencrypt/boulder/jose"
+	jose "github.com/letsencrypt/boulder/Godeps/_workspace/src/github.com/square/go-jose"
 	"net/http"
 )
 

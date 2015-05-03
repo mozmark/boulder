@@ -8,7 +8,7 @@ package core
 import (
 	"crypto/x509"
 	"encoding/json"
-	"github.com/letsencrypt/boulder/jose"
+	jose "github.com/letsencrypt/boulder/Godeps/_workspace/src/github.com/square/go-jose"
 	"time"
 )
 
@@ -66,7 +66,7 @@ type CertificateRequest struct {
 }
 
 type rawCertificateRequest struct {
-	CSR            jose.JsonBuffer `json:"csr"`            // The encoded CSR
+	CSR            []byte          `json:"csr"`            // The encoded CSR
 	Authorizations []AcmeURL       `json:"authorizations"` // Authorizations
 }
 
@@ -210,7 +210,7 @@ type Authorization struct {
 // thing exposed on the wire is the certificate itself.
 type Certificate struct {
 	// The encoded, signed certificate
-	DER jose.JsonBuffer
+	DER []byte
 
 	// The parsed version of DER. Useful for extracting things like serial number.
 	ParsedCertificate *x509.Certificate

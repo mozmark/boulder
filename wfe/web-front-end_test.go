@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/letsencrypt/boulder/core"
-	"github.com/letsencrypt/boulder/jose"
+	jose "github.com/letsencrypt/boulder/Godeps/_workspace/src/github.com/square/go-jose"
 
 	"github.com/letsencrypt/boulder/ra"
 	"github.com/letsencrypt/boulder/test"
