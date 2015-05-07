@@ -87,7 +87,6 @@ func main() {
 		// Wire them up
 		wfe.RA = &ra
 		wfe.SA = sa
-		wfe.CA = ca
 		wfe.Stats = stats
 		ra.CA = ca
 		ra.SA = sa
