@@ -6,10 +6,12 @@
 package wfe
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -71,6 +73,8 @@ func (wfe *WebFrontEndImpl) HandlePaths() {
 	wfe.AuthzBase = wfe.BaseURL + wfe.AuthzPath
 	wfe.NewCert = wfe.BaseURL + wfe.NewCertPath
 	wfe.CertBase = wfe.BaseURL + wfe.CertPath
+
+	http.HandleFunc("/", wfe.Index)
 	http.HandleFunc(wfe.NewRegPath, wfe.NewRegistration)
 	http.HandleFunc(wfe.NewAuthzPath, wfe.NewAuthorization)
 	http.HandleFunc(wfe.NewCertPath, wfe.NewCertificate)
@@ -82,6 +86,29 @@ func (wfe *WebFrontEndImpl) HandlePaths() {
 }
 
 // Method implementations
+
+func (wfe *WebFrontEndImpl) Index(response http.ResponseWriter, request *http.Request) {
+	// http://golang.org/pkg/net/http/#example_ServeMux_Handle
+	// The "/" pattern matches everything, so we need to check
+	// that we're at the root here.
+	if request.URL.Path != "/" {
+		http.NotFound(response, request)
+		return
+	}
+
+	tmpl := template.Must(template.New("body").Parse(`<html>
+  <body>
+    <a href="https://letsencrypt.org/">Let's Encrypt</a> Certificate Authority
+    running <a href="https://github.com/letsencrypt/boulder">Boulder</a>,
+    a reference <a href="https://letsencrypt.github.io/acme-spec/">ACME</a>
+    server implementation. New registration is available at
+    <a href="{{.NewReg}}">{{.NewReg}}</a>.
+  </body>
+</html>
+`))
+	tmpl.Execute(response, wfe)
+	response.Header().Set("Content-Type", "text/html")
+}
 
 func verifyPOST(request *http.Request) ([]byte, jose.JsonWebKey, error) {
 	zeroKey := jose.JsonWebKey{}
@@ -157,7 +184,7 @@ func (wfe *WebFrontEndImpl) NewRegistration(response http.ResponseWriter, reques
 
 	body, key, err := verifyPOST(request)
 	if err != nil {
-		wfe.sendError(response, fmt.Sprintf("Unable to read/verify body: %v", err), http.StatusBadRequest)
+		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
 		return
 	}
 
@@ -258,22 +285,24 @@ func (wfe *WebFrontEndImpl) RevokeCertificate(response http.ResponseWriter, requ
 	}
 
 	type RevokeRequest struct {
-		Serial string
+		CertificateDER jose.JsonBuffer `json:"certificate"`
 	}
 	var revokeRequest RevokeRequest
 	if err = json.Unmarshal(body, &revokeRequest); err != nil {
-		fmt.Println("Couldn't unmarshal in revoke request", string(body))
+		wfe.log.Debug(fmt.Sprintf("Couldn't unmarshal in revoke request %s", string(body)))
 		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
 		return
 	}
-	if len(revokeRequest.Serial) != 32 {
-		wfe.log.Debug("Bad serial in revoke request " + revokeRequest.Serial)
+	providedCert, err := x509.ParseCertificate(revokeRequest.CertificateDER)
+	if err != nil {
+		wfe.log.Debug("Couldn't parse cert in revoke request.")
 		wfe.sendError(response, "Unable to read/verify body", http.StatusBadRequest)
 		return
 	}
 
-	certDER, err := wfe.SA.GetCertificate(revokeRequest.Serial)
-	if err != nil {
+	serial := core.SerialToString(providedCert.SerialNumber)
+	certDER, err := wfe.SA.GetCertificate(serial)
+	if err != nil || !bytes.Equal(certDER, revokeRequest.CertificateDER) {
 		wfe.sendError(response, "No such certificate", http.StatusNotFound)
 		return
 	}
@@ -283,7 +312,7 @@ func (wfe *WebFrontEndImpl) RevokeCertificate(response http.ResponseWriter, requ
 		return
 	}
 
-	certStatus, err := wfe.SA.GetCertificateStatus(revokeRequest.Serial)
+	certStatus, err := wfe.SA.GetCertificateStatus(serial)
 	if err != nil {
 		wfe.sendError(response, "No such certificate", http.StatusNotFound)
 		return
@@ -311,13 +340,15 @@ func (wfe *WebFrontEndImpl) RevokeCertificate(response http.ResponseWriter, requ
 		return
 	}
 
-	err = wfe.CA.RevokeCertificate(revokeRequest.Serial)
+	err = wfe.RA.RevokeCertificate(*parsedCertificate)
 	if err != nil {
 		wfe.sendError(response,
 			"Failed to revoke certificate",
 			http.StatusInternalServerError)
 	} else {
-		fmt.Println("Revoked", revokeRequest.Serial)
+		wfe.log.Debug(fmt.Sprintf("Revoked %v", serial))
+		// incr revoked cert stat
+		wfe.Stats.Inc("RevokedCertificates", 1, 1.0)
 		response.WriteHeader(http.StatusOK)
 	}
 }
@@ -592,12 +623,6 @@ func (wfe *WebFrontEndImpl) Certificate(response http.ResponseWriter, request *h
 		if _, err = response.Write(cert); err != nil {
 			wfe.log.Warning(fmt.Sprintf("Could not write response: %s", err))
 		}
-
-	case "POST":
-		// TODO: Handle revocation in POST
-
-		// incr revoked cert stat
-		wfe.Stats.Inc("RevokedCertificates", 1, 1.0)
 	}
 }
 

@@ -93,6 +93,14 @@ func (ssa *SQLStorageAuthority) InitTables() (err error) {
 
 		// Create certificates table. This should be effectively append-only, enforced
 		// by DB permissions.
+		// serial: Serial number of the certificate, as a hex-encoded string
+		// digest: The base64-encoded SHA-256 digest of the DER form of the certificate
+		// spkiDigest: The base64-encoded SHA-256 digest of the DER form of the
+		//   certificate's Subject Public Key Info,
+		//   per https://tools.ietf.org/html/rfc7469#page-27
+		// value: The DER form of the certificate
+		// issued: The actual time the certificate was issued (typically not the
+		//   same as the certificate's notBefore field, which is slightly backdated)
 		`CREATE TABLE IF NOT EXISTS certificates (
 		serial VARCHAR(255) PRIMARY KEY NOT NULL,
 		digest VARCHAR(255) NOT NULL,
@@ -525,7 +533,7 @@ func (ssa *SQLStorageAuthority) AddCertificate(certDER []byte) (digest string, e
 	if err != nil {
 		return
 	}
-	serial := fmt.Sprintf("%032x", parsedCertificate.SerialNumber)
+	serial := core.SerialToString(parsedCertificate.SerialNumber)
 
 	tx, err := ssa.db.Begin()
 	if err != nil {
