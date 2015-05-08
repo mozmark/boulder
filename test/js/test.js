@@ -135,6 +135,7 @@ function post(url, body, callback) {
   var payload = JSON.stringify(jws);
 
   var req = request.post(url, callback);
+  console.log('Posting to', url, ':\n', payload);
   req.write(payload)
   req.end();
   return req;
@@ -254,7 +255,9 @@ function sendAgreement(answers) {
 
   console.log("Posting agreement to: " + state.registrationURL)
 
-  state.registration.agreement = state.termsURL;
+  state.registration = {
+    agreement: state.termsURL
+  }
   post(state.registrationURL, state.registration,
     function(err, resp, body) {
       if (err) {

@@ -288,9 +288,6 @@ type Authorization struct {
 // Certificate objects are entirely internal to the server.  The only
 // thing exposed on the wire is the certificate itself.
 type Certificate struct {
-	// The encoded, signed certificate
-	DER jose.JsonBuffer `db:"-"`
-
 	// The parsed version of DER. Useful for extracting things like serial number.
 	ParsedCertificate *x509.Certificate `db:"-"`
 
@@ -301,7 +298,7 @@ type Certificate struct {
 
 	Serial   string `db:"serial"`
 	Digest   string `db:"digest"`
-	Content  []byte `db:"content"`
+	DER      []byte `db:"der"`
 	Issued   time.Time `db:"issued"`
 }
 

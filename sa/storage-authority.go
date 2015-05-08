@@ -17,7 +17,7 @@ import (
 	gorp "github.com/letsencrypt/boulder/Godeps/_workspace/src/gopkg.in/gorp.v1"
 
 	"github.com/letsencrypt/boulder/core"
-	"github.com/letsencrypt/boulder/jose"
+	jose "github.com/letsencrypt/boulder/Godeps/_workspace/src/github.com/square/go-jose"
 	blog "github.com/letsencrypt/boulder/log"
 )
 
@@ -330,8 +330,7 @@ func (ssa *SQLStorageAuthority) GetCertificateByShortSerial(shortSerial string) 
 	if err != nil {
 		return
 	}
-	cert = certificate.Content
-	return
+	return certificate.DER, nil
 }
 
 // GetCertificate takes a serial number and returns the corresponding
@@ -348,8 +347,7 @@ func (ssa *SQLStorageAuthority) GetCertificate(serial string) (cert []byte, err 
 	if err != nil {
 		return
 	}
-	cert = certificate.Content
-	return
+	return certificate.DER, nil
 }
 
 // GetCertificateStatus takes a hexadecimal string representing the full 128-bit serial
@@ -599,7 +597,7 @@ func (ssa *SQLStorageAuthority) AddCertificate(certDER []byte) (digest string, e
 	cert := &core.Certificate{
 		Serial: serial,
 		Digest: digest,
-		Content: certDER,
+		DER: certDER,
 		Issued: time.Now(),
 	}
 	certStatus := &core.CertificateStatus{
@@ -617,16 +615,7 @@ func (ssa *SQLStorageAuthority) AddCertificate(certDER []byte) (digest string, e
 		return
 	}
 
-<<<<<<< HEAD
-	digest = core.Fingerprint256(certDER)
-
-	spkiDigest := core.KeyDigest(parsedCertificate.PublicKey)
-
-	_, err = tx.Exec("INSERT INTO certificates (serial, digest, spkiDigest, value, issued) VALUES (?,?,?,?,?);",
-		serial, digest, spkiDigest, certDER, time.Now())
-=======
 	err = tx.Insert(cert)
->>>>>>> master
 	if err != nil {
 		tx.Rollback()
 		return
