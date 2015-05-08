@@ -98,7 +98,7 @@
 		},
 		{
 			"ImportPath": "github.com/square/go-jose",
-			"Rev": "2967104f066a4b68068a0a599fcbdab19655e24b"
+			"Rev": "cb717116f65bdddb48e5a356132ea5918d0ca7b8"
 		},
 		{
 			"ImportPath": "github.com/streadway/amqp",
