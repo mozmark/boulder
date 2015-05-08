@@ -57,8 +57,14 @@ type boulderTypeConverter struct{}
 
 func (tc boulderTypeConverter) ToDb(val interface{}) (interface{}, error) {
 	switch t := val.(type) {
-	case core.AcmeIdentifier, jose.JsonWebKey, []core.Challenge, []core.AcmeURL, [][]int:
+	case core.AcmeIdentifier, []core.Challenge, []core.AcmeURL, [][]int:
 		jsonBytes, err := json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+		return string(jsonBytes), nil
+	case jose.JsonWebKey:
+		jsonBytes, err := t.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +80,7 @@ func (tc boulderTypeConverter) ToDb(val interface{}) (interface{}, error) {
 
 func (tc boulderTypeConverter) FromDb(target interface{}) (gorp.CustomScanner, bool) {
 	switch target.(type) {
-	case *core.AcmeIdentifier, *jose.JsonWebKey, *[]core.Challenge, *[]core.AcmeURL, *[][]int:
+	case *core.AcmeIdentifier, *[]core.Challenge, *[]core.AcmeURL, *[][]int:
 		binder := func(holder, target interface{}) error {
 			s, ok := holder.(*string)
 			if !ok {
@@ -82,6 +88,17 @@ func (tc boulderTypeConverter) FromDb(target interface{}) (gorp.CustomScanner, b
 			}
 			b := []byte(*s)
 			return json.Unmarshal(b, target)
+		}
+		return gorp.CustomScanner{Holder: new(string), Target: target, Binder: binder}, true
+	case *jose.JsonWebKey:
+		binder := func(holder, target interface{}) error {
+			s, ok := holder.(*string)
+			if !ok {
+				return errors.New("FromDb: Unable to convert *string")
+			}
+			b := []byte(*s)
+			k := jose.JsonWebKey{}
+			return k.UnmarshalJSON(b)
 		}
 		return gorp.CustomScanner{Holder: new(string), Target: target, Binder: binder}, true
 	case *core.AcmeStatus:
