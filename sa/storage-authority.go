@@ -57,7 +57,7 @@ type boulderTypeConverter struct{}
 
 func (tc boulderTypeConverter) ToDb(val interface{}) (interface{}, error) {
 	switch t := val.(type) {
-	case core.AcmeIdentifier, []core.Challenge, []core.AcmeURL, [][]int:
+	case core.AcmeIdentifier, []core.Challenge, []core.AcmeURL, [][]int, core.JsonBuffer:
 		jsonBytes, err := json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -87,7 +87,7 @@ func (tc boulderTypeConverter) ToDb(val interface{}) (interface{}, error) {
 
 func (tc boulderTypeConverter) FromDb(target interface{}) (gorp.CustomScanner, bool) {
 	switch target.(type) {
-	case *core.AcmeIdentifier, *[]core.Challenge, *[]core.AcmeURL, *[][]int:
+	case *core.AcmeIdentifier, *[]core.Challenge, *[]core.AcmeURL, *[][]int, core.JsonBuffer:
 		binder := func(holder, target interface{}) error {
 			s, ok := holder.(*string)
 			if !ok {
