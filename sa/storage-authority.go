@@ -64,6 +64,13 @@ func (tc boulderTypeConverter) ToDb(val interface{}) (interface{}, error) {
 		}
 		return string(jsonBytes), nil
 	case jose.JsonWebKey:
+		// XXX hack: Some of our storage methods, like NewAuthorization, expect to
+		// write to the DB with the default, empty key, so we treat it specially,
+		// deserializing to a nil key pointer. TODO: Modify authorizations to refer
+		// to a registration id, and make sure registration ids are always filled.
+		if t.KeyID == "" {
+			return "", nil
+		}
 		jsonBytes, err := t.MarshalJSON()
 		if err != nil {
 			return nil, err
@@ -97,8 +104,15 @@ func (tc boulderTypeConverter) FromDb(target interface{}) (gorp.CustomScanner, b
 				return errors.New("FromDb: Unable to convert *string")
 			}
 			b := []byte(*s)
-			k := jose.JsonWebKey{}
-			return k.UnmarshalJSON(b)
+			k := target.(*jose.JsonWebKey)
+			if *s != "" {
+				return k.UnmarshalJSON(b)
+			} else {
+				// XXX HACK: Sometimes we can have an empty string the in the DB where a
+				// key should be. We should fix that. In the meantime, return the
+				// default JsonWebKey in such situations.
+				return nil
+			}
 		}
 		return gorp.CustomScanner{Holder: new(string), Target: target, Binder: binder}, true
 	case *core.AcmeStatus:
@@ -385,27 +399,26 @@ func (ssa *SQLStorageAuthority) GetCertificateStatus(serial string) (status core
 	return
 }
 
-func (ssa *SQLStorageAuthority) NewRegistration() (id string, err error) {
+func (ssa *SQLStorageAuthority) NewRegistration(reg core.Registration) (output core.Registration, err error) {
 	tx, err := ssa.dbMap.Begin()
 	if err != nil {
 		return
 	}
 
 	// Check that it doesn't exist already
-	id = core.NewToken()
+	id := core.NewToken()
 	for existingRegistration(tx, id) {
 		id = core.NewToken()
 	}
-
-	reg := &core.Registration{}
 	reg.ID = id
 
-	err = tx.Insert(reg)
+	err = tx.Insert(&reg)
 	if err != nil {
 		tx.Rollback()
 		return
 	}
 
+	json, _ := reg.Key.MarshalJSON()
 	err = tx.Commit()
 	return
 }

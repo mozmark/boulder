@@ -200,12 +200,13 @@ func (wfe *WebFrontEndImpl) NewRegistration(response http.ResponseWriter, reques
 		return
 	}
 
-	var init core.Registration
+	var init, unmarshalled core.Registration
 	err = json.Unmarshal(body, &init)
 	if err != nil {
 		wfe.sendError(response, "Error unmarshaling JSON", http.StatusBadRequest)
 		return
 	}
+	init.MergeUpdate(unmarshalled)
 
 	reg, err := wfe.RA.NewRegistration(init, *key)
 	if err != nil {
@@ -485,7 +486,8 @@ func (wfe *WebFrontEndImpl) Challenge(authz core.Authorization, response http.Re
 }
 
 func (wfe *WebFrontEndImpl) Registration(response http.ResponseWriter, request *http.Request) {
-	// Requests to this handler should have a path that leads to a known authz
+	// Requests to this handler should have a path that leads to a known
+	// registration
 	id := parseIDFromPath(request.URL.Path)
 	reg, err := wfe.SA.GetRegistration(id)
 	if err != nil {
@@ -518,6 +520,12 @@ func (wfe *WebFrontEndImpl) Registration(response http.ResponseWriter, request *
 			return
 		}
 
+		// Check that the signing key is the right key
+		if core.KeyDigest(key) != core.KeyDigest(reg.Key) {
+			wfe.sendError(response, "Signing key does not match key in registration", http.StatusForbidden)
+			return
+		}
+
 		var update core.Registration
 		err = json.Unmarshal(body, &update)
 		if err != nil {
@@ -525,16 +533,9 @@ func (wfe *WebFrontEndImpl) Registration(response http.ResponseWriter, request *
 			return
 		}
 
-		// Check that the signing key is the right key
-		if core.KeyDigest(key) != core.KeyDigest(reg.Key) {
-			wfe.sendError(response, "Signing key does not match key in registration", http.StatusForbidden)
-			return
-		}
-
 		// Ask the RA to update this authorization
 		updatedReg, err := wfe.RA.UpdateRegistration(reg, update)
 		if err != nil {
-			fmt.Println(err)
 			wfe.sendError(response, "Unable to update registration", http.StatusInternalServerError)
 			return
 		}

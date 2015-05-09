@@ -96,7 +96,7 @@ type StorageGetter interface {
 }
 
 type StorageAdder interface {
-	NewRegistration() (string, error)
+	NewRegistration(Registration) (Registration, error)
 	UpdateRegistration(Registration) error
 
 	NewPendingAuthorization() (string, error)

@@ -47,20 +47,14 @@ func lastPathSegment(url core.AcmeURL) string {
 }
 
 func (ra *RegistrationAuthorityImpl) NewRegistration(init core.Registration, key jose.JsonWebKey) (reg core.Registration, err error) {
-	regID, err := ra.SA.NewRegistration()
-	if err != nil {
-		return
-	}
-
 	reg = core.Registration{
-		ID:            regID,
 		Key:           key,
 		RecoveryToken: core.NewToken(),
 	}
 	reg.MergeUpdate(init)
 
 	// Store the authorization object, then return it
-	err = ra.SA.UpdateRegistration(reg)
+	reg, err = ra.SA.NewRegistration(reg)
 	return
 }
 

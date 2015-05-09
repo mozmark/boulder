@@ -260,7 +260,7 @@ function sendAgreement(answers) {
   }
   post(state.registrationURL, state.registration,
     function(err, resp, body) {
-      if (err) {
+      if (err || Math.floor(resp.statusCode / 100) != 2) {
         console.log("Couldn't POST agreement back to server, aborting.");
         console.log("error: " + err);
         console.log(body);
@@ -389,8 +389,11 @@ function getCertificate() {
 
   cli.spinner("Requesting certificate");
 
+  var url = state.newCertificateURL;
+  console.log('Posting to', url, ':\n', payload);
+
   var req = request.post({
-    url: state.newCertificateURL,
+    url: url,
     encoding: null // Return body as buffer.
   }, downloadCertificate);
   req.write(payload)
