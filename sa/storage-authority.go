@@ -418,9 +418,8 @@ func (ssa *SQLStorageAuthority) NewRegistration(reg core.Registration) (output c
 		return
 	}
 
-	json, _ := reg.Key.MarshalJSON()
 	err = tx.Commit()
-	return
+	return reg, err
 }
 
 // MarkCertificateRevoked stores the fact that a certificate is revoked, along
