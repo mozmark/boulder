@@ -356,7 +356,7 @@ func (ssa *SQLStorageAuthority) GetCertificateByShortSerial(shortSerial string) 
 	}
 
 	var certificate core.Certificate
-	err = ssa.dbMap.SelectOne(&certificate, "SELECT content FROM certificates WHERE serial LIKE :shortSerial",
+	err = ssa.dbMap.SelectOne(&certificate, "SELECT * FROM certificates WHERE serial LIKE :shortSerial",
 		map[string]interface{} {"shortSerial": shortSerial+"%"})
 	if err != nil {
 		return
@@ -373,7 +373,7 @@ func (ssa *SQLStorageAuthority) GetCertificate(serial string) (cert []byte, err 
 	}
 
 	var certificate core.Certificate
-	err = ssa.dbMap.SelectOne(&certificate, "SELECT content FROM certificates WHERE serial = :serial",
+	err = ssa.dbMap.SelectOne(&certificate, "SELECT * FROM certificates WHERE serial = :serial",
 		map[string]interface{} {"serial": serial})
 	if err != nil {
 		return
