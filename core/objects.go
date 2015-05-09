@@ -331,7 +331,7 @@ type Certificate struct {
 
 	Serial   string `db:"serial"`
 	Digest   string `db:"digest"`
-	DER      JsonBuffer `db:"der"`
+	DER      []byte `db:"der"`
 	Issued   time.Time `db:"issued"`
 }
 
